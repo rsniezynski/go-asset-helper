@@ -6,7 +6,7 @@
 // tools such as grunt or gulp. The default configuration relies on a presence of a JSON file describing
 // a mapping from original to minified assets. Such file can be prepared e.g. by gulp-rev.
 //
-// Example of such file:
+// Example manifest file:
 //     {
 //       "js/main.min.js": "js/main.min-da89a0c4.js",
 //       "css/style.min.css": "css/style.min-16680603.css"
@@ -82,7 +82,7 @@ type Static struct {
 	mappingBuilder MappingBuilder
 }
 
-// NewStatic creates an instance of Static, which can be then used to attach helper functions to templates.
+// NewStatic creates an instance of static, which can be then used to attach helper functions to templates.
 func NewStatic(urlPrefix string, manifestPath string, options ...optionSetter) (*Static, error) {
 	if !strings.HasSuffix(urlPrefix, "/") {
 		urlPrefix += "/"
@@ -112,7 +112,7 @@ func NewStatic(urlPrefix string, manifestPath string, options ...optionSetter) (
 // relative to the directory from which the application process is started. This behavior can
 // be modified by providing a different loader on Static object creation.
 // attrs can be used to pass additional attributes to the tag. There must be an even numner of
-// attrs.
+// attrs. Usually not used directly, but registered in tempalte via FuncMap.
 func (st *Static) ScriptTag(path string, attrs ...string) (template.HTML, error) {
 	defaultAttrMap := map[string]string{"type": "text/javascript"}
 	attrMap, err := attrSliceToMap(attrs)
@@ -124,7 +124,7 @@ func (st *Static) ScriptTag(path string, attrs ...string) (template.HTML, error)
 	return template.HTML(fmt.Sprintf(`<script %s></script>`, mapToAttrs(defaultAttrMap))), nil
 }
 
-// LinkTag returns HTML script tag. See ScriptTag for additional information.
+// LinkTag returns HTML script tag. See ScriptTag for additional information. Usually not used directly, but registered in tempalte via FuncMap.
 func (st *Static) LinkTag(path string, attrs ...string) (template.HTML, error) {
 	defaultAttrMap := map[string]string{"type": "text/css", "rel": "stylesheet"}
 	attrMap, err := attrSliceToMap(attrs)
@@ -136,7 +136,7 @@ func (st *Static) LinkTag(path string, attrs ...string) (template.HTML, error) {
 	return template.HTML(fmt.Sprintf(`<link %s/>`, mapToAttrs(defaultAttrMap))), nil
 }
 
-// Static returns URL prefix for static assets. Mainly intended to be used for image files etc.
+// Static returns URL prefix for static assets. Mainly intended to be used for image files etc. Usually not used directly, but registered in tempalte via FuncMap.
 func (st *Static) Static() template.HTML {
 	return template.HTML(st.urlPrefix)
 }
@@ -166,12 +166,12 @@ type StaticMapper interface {
 // MappingBuilder is a function that produces StaticMapper instances
 type MappingBuilder func() (StaticMapper, error)
 
-type StaticMap struct {
+type staticMap struct {
 	innerMap    map[string]interface{}
 	useMinified bool
 }
 
-func (sm StaticMap) Get(name string) string {
+func (sm staticMap) Get(name string) string {
 	if sm.useMinified {
 		minifiedName := toMinifiedName(name)
 		if value, ok := getStringFromMap(sm.innerMap, minifiedName); ok {
@@ -211,9 +211,9 @@ func createMapping(load Loader, path string, useMinified bool) (StaticMapper, er
 		if err != nil {
 			return nil, err
 		}
-		return &StaticMap{manifest.(map[string]interface{}), useMinified}, nil
+		return &staticMap{manifest.(map[string]interface{}), useMinified}, nil
 	}
-	return &StaticMap{map[string]interface{}{}, useMinified}, nil
+	return &staticMap{map[string]interface{}{}, useMinified}, nil
 }
 
 type optionSetter func(*Static)
