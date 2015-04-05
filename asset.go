@@ -72,6 +72,7 @@ import (
 	"strings"
 )
 
+// Static holds configurtion for the asset resolver. It should be created using NewStatic
 type Static struct {
 	urlPrefix      string
 	manifestPath   string
@@ -81,6 +82,7 @@ type Static struct {
 	mappingBuilder MappingBuilder
 }
 
+// NewStatic creates an instance of Static, which can be then used to attach helper functions to templates.
 func NewStatic(urlPrefix string, manifestPath string, options ...optionSetter) (*Static, error) {
 	if !strings.HasSuffix(urlPrefix, "/") {
 		urlPrefix += "/"
@@ -106,6 +108,11 @@ func NewStatic(urlPrefix string, manifestPath string, options ...optionSetter) (
 	return static, nil
 }
 
+// ScriptTag returns HTML script tag; path should point to an asset, by default a path on the disk
+// relative to the directory from which the application process is started. This behavior can
+// be modified by providing a different loader on Static object creation.
+// attrs can be used to pass additional attributes to the tag. There must be an even numner of
+// attrs.
 func (st *Static) ScriptTag(path string, attrs ...string) (template.HTML, error) {
 	defaultAttrMap := map[string]string{"type": "text/javascript"}
 	attrMap, err := attrSliceToMap(attrs)
@@ -117,6 +124,7 @@ func (st *Static) ScriptTag(path string, attrs ...string) (template.HTML, error)
 	return template.HTML(fmt.Sprintf(`<script %s></script>`, mapToAttrs(defaultAttrMap))), nil
 }
 
+// LinkTag returns HTML script tag. See ScriptTag for additional information.
 func (st *Static) LinkTag(path string, attrs ...string) (template.HTML, error) {
 	defaultAttrMap := map[string]string{"type": "text/css", "rel": "stylesheet"}
 	attrMap, err := attrSliceToMap(attrs)
@@ -128,14 +136,18 @@ func (st *Static) LinkTag(path string, attrs ...string) (template.HTML, error) {
 	return template.HTML(fmt.Sprintf(`<link %s/>`, mapToAttrs(defaultAttrMap))), nil
 }
 
-func (st *Static) Static() (template.HTML, error) {
-	return template.HTML(st.urlPrefix), nil
+// Static returns URL prefix for static assets. Mainly intended to be used for image files etc.
+func (st *Static) Static() template.HTML {
+	return template.HTML(st.urlPrefix)
 }
 
+// Attach sets ScriptTag, LinkTag and Stastic as, respectively, scripttag, linktag and static template functions.
 func (st *Static) Attach(tmpl *template.Template) {
 	tmpl.Funcs(st.FuncMap())
 }
 
+// FuncMap returns template.FuncMap that can be used to attach go-asset-helper functions
+// to a template.
 func (st *Static) FuncMap() template.FuncMap {
 	return map[string]interface{}{
 		"scripttag": st.ScriptTag,
@@ -144,10 +156,14 @@ func (st *Static) FuncMap() template.FuncMap {
 	}
 }
 
+// StaticMapper is an interface for mapping between asset paths and references to be put
+// in template tags
 type StaticMapper interface {
+	// Get returns reference to an specified as a path.
 	Get(string) string
 }
 
+// MappingBuilder is a function that produces StaticMapper instances
 type MappingBuilder func() (StaticMapper, error)
 
 type StaticMap struct {
@@ -202,16 +218,21 @@ func createMapping(load Loader, path string, useMinified bool) (StaticMapper, er
 
 type optionSetter func(*Static)
 
+// Loader returns file contents for a given path
 type Loader func(string) ([]byte, error)
 
+// WithManifestLoader can be used to provide Loader implementation in NewStatic
 func WithManifestLoader(load Loader) optionSetter {
 	return func(st *Static) { st.manifestLoader = load }
 }
 
+// WithMappingBuilder can be used to provide MappingBuilder implementation in NewStatic
 func WithMappingBuilder(builder MappingBuilder) optionSetter {
 	return func(st *Static) { st.mappingBuilder = builder }
 }
 
+// WithUseMinified can be used in NewStatic to specify whether resoruce mapping should be used.
+// false can be useful in debug mode.
 func WithUseMinified(minified bool) optionSetter {
 	return func(st *Static) { st.useMinified = minified }
 }
