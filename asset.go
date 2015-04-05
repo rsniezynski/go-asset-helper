@@ -55,8 +55,8 @@
 //             asset.WithManifestLoader(Asset),
 //         )
 //
-//         // There's also WithMappingBuilder option to create the asset mapper without
-//         // using the manifest file. No example at this time.
+//         // There's also WithMappingBuilder option to create an asset mapper without
+//         // using the manifest file.
 //     }
 package asset
 
