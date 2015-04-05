@@ -64,6 +64,6 @@ func main() {
     )
 
     // There's also WithMappingBuilder option to create the asset mapper without
-    // using the manifest file. No example at this time.
+    // using the manifest file.
 }
 ```
