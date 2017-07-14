@@ -63,6 +63,9 @@ func main() {
         asset.WithManifestLoader(Asset),
     )
 
+    // Use subresource integrity for browsers to verify the content of the files.
+    static, err = asset.NewStatic("/static", "/path/to/manifest.json", asset.WithUseSri(true))
+
     // There's also WithMappingBuilder option to create the asset mapper without
     // using the manifest file.
 }

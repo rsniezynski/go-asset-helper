@@ -2,6 +2,10 @@ package asset
 
 import (
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -64,6 +68,33 @@ func TestScriptTagOddParams(t *testing.T) {
 	require.NotNil(t, err)
 }
 
+func TestScriptTagSri(t *testing.T) {
+	content := []byte("the quick brown fox jumps over the lazy dog\n")
+	sha := "sha256-EVOkCA8fywRCWqC4QcKxRgb+bfJdkHbSofrOLVr1cSk="
+
+	tmpfile, err := ioutil.TempFile("", "script-sri")
+	require.Nil(t, err)
+	defer os.Remove(tmpfile.Name())
+	_, err = tmpfile.Write(content)
+	require.Nil(t, err)
+	err = tmpfile.Close()
+	require.Nil(t, err)
+
+	loader := func(name string) ([]byte, error) {
+		return []byte(
+			`{"script-sri":"` + strings.TrimPrefix(tmpfile.Name(), "/") + `"}`,
+		), nil
+	}
+
+	static, err := NewStatic("", "data/manifest.json", WithManifestLoader(loader), WithUseSri(true))
+	require.Nil(t, err)
+	tag, err := static.ScriptTag("script-sri")
+	require.Nil(t, err)
+
+	expected := fmt.Sprintf(`<script crossorigin="anonymous" integrity="%s" src="%s" type="text/javascript"></script>`, sha, tmpfile.Name())
+	require.Equal(t, expected, string(tag))
+}
+
 func TestLinkTag(t *testing.T) {
 	loader := func(name string) ([]byte, error) {
 		return []byte(
@@ -96,6 +127,33 @@ func TestLinkTagOddParams(t *testing.T) {
 	require.Nil(t, err)
 	_, err = static.LinkTag("css/other.css", "media", "some value", "title", "whatever", "odd")
 	require.NotNil(t, err)
+}
+
+func TestLinkTagSri(t *testing.T) {
+	content := []byte("the quick brown fox jumps over the lazy dog\n")
+	sha := "sha256-EVOkCA8fywRCWqC4QcKxRgb+bfJdkHbSofrOLVr1cSk="
+
+	tmpfile, err := ioutil.TempFile("", "link-sri")
+	require.Nil(t, err)
+	defer os.Remove(tmpfile.Name())
+	_, err = tmpfile.Write(content)
+	require.Nil(t, err)
+	err = tmpfile.Close()
+	require.Nil(t, err)
+
+	loader := func(name string) ([]byte, error) {
+		return []byte(
+			`{"link-sri":"` + strings.TrimPrefix(tmpfile.Name(), "/") + `"}`,
+		), nil
+	}
+
+	static, err := NewStatic("", "data/manifest.json", WithManifestLoader(loader), WithUseSri(true))
+	require.Nil(t, err)
+	tag, err := static.LinkTag("link-sri")
+	require.Nil(t, err)
+
+	expected := fmt.Sprintf(`<link crossorigin="anonymous" href="%s" integrity="%s" rel="stylesheet" type="text/css"/>`, tmpfile.Name(), sha)
+	require.Equal(t, expected, string(tag))
 }
 
 func TestCreateMappingNoLoader(t *testing.T) {
