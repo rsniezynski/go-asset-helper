@@ -2,8 +2,9 @@ package asset
 
 import (
 	"errors"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestMapToAttrs(t *testing.T) {
@@ -40,7 +41,7 @@ func TestScriptTag(t *testing.T) {
 	tag, err := static.ScriptTag("js/other.js")
 	require.Nil(t, err)
 	require.Equal(t,
-		`<script src="/static/dist/other-1234.min.js" type="text/javascript"></script>`, tag,
+		`<script src="/static/dist/other-1234.min.js" type="text/javascript"></script>`, string(tag),
 	)
 }
 
@@ -51,7 +52,7 @@ func TestScriptTagParams(t *testing.T) {
 	tag, err := static.ScriptTag("js/other.js", "data-main", "some value", "defer", "defer")
 	require.Nil(t, err)
 	require.Equal(t,
-		`<script data-main="some value" defer="defer" src="/static/js/other.js" type="text/javascript"></script>`, tag,
+		`<script data-main="some value" defer="defer" src="/static/js/other.js" type="text/javascript"></script>`, string(tag),
 	)
 }
 
@@ -74,7 +75,7 @@ func TestLinkTag(t *testing.T) {
 	tag, err := static.LinkTag("css/other.css")
 	require.Nil(t, err)
 	require.Equal(t,
-		`<link href="/static/dist/other-1234.min.css" rel="stylesheet" type="text/css"/>`, tag,
+		`<link href="/static/dist/other-1234.min.css" rel="stylesheet" type="text/css"/>`, string(tag),
 	)
 }
 
@@ -85,7 +86,7 @@ func TestLinkTagParams(t *testing.T) {
 	tag, err := static.LinkTag("css/other.css", "media", "some value", "title", "whatever")
 	require.Nil(t, err)
 	require.Equal(t,
-		`<link href="/static/css/other.css" media="some value" rel="stylesheet" title="whatever" type="text/css"/>`, tag,
+		`<link href="/static/css/other.css" media="some value" rel="stylesheet" title="whatever" type="text/css"/>`, string(tag),
 	)
 }
 
