@@ -55,18 +55,25 @@
 //             asset.WithManifestLoader(Asset),
 //         )
 //
+//         // Use subresource integrity for browsers to verify the content of the files.
+//         static, err = asset.NewStatic("/static", "/path/to/manifest.json", asset.WithUseSri(true))
+//
 //         // There's also WithMappingBuilder option to create an asset mapper without
 //         // using the manifest file.
 //     }
 package asset
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
 	"html/template"
+	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -78,8 +85,11 @@ type Static struct {
 	manifestPath   string
 	manifestLoader Loader
 	useMinified    bool
+	useSri         bool
 	mapping        StaticMapper
 	mappingBuilder MappingBuilder
+
+	sriCache map[string]string
 }
 
 // NewStatic creates an instance of static, which can be then used to attach helper functions to templates.
@@ -91,6 +101,7 @@ func NewStatic(urlPrefix string, manifestPath string, options ...optionSetter) (
 		urlPrefix:      urlPrefix,
 		manifestPath:   manifestPath,
 		manifestLoader: ioutil.ReadFile,
+		sriCache:       make(map[string]string),
 	}
 	for _, optionSetter := range options {
 		optionSetter(static)
@@ -121,6 +132,16 @@ func (st *Static) ScriptTag(path string, attrs ...string) (template.HTML, error)
 	}
 	updateMap(defaultAttrMap, attrMap)
 	defaultAttrMap["src"] = st.urlPrefix + st.mapping.Get(path)
+
+	if st.useSri {
+		hash, err := st.getSriHash(path)
+		if err != nil {
+			return "", err
+		}
+		defaultAttrMap["integrity"] = hash
+		defaultAttrMap["crossorigin"] = "anonymous"
+	}
+
 	return template.HTML(fmt.Sprintf(`<script %s></script>`, mapToAttrs(defaultAttrMap))), nil
 }
 
@@ -133,7 +154,30 @@ func (st *Static) LinkTag(path string, attrs ...string) (template.HTML, error) {
 	}
 	updateMap(defaultAttrMap, attrMap)
 	defaultAttrMap["href"] = st.urlPrefix + st.mapping.Get(path)
+
+	if st.useSri {
+		hash, err := st.getSriHash(path)
+		if err != nil {
+			return "", err
+		}
+		defaultAttrMap["integrity"] = hash
+		defaultAttrMap["crossorigin"] = "anonymous"
+	}
 	return template.HTML(fmt.Sprintf(`<link %s/>`, mapToAttrs(defaultAttrMap))), nil
+}
+
+func (st *Static) getSriHash(path string) (string, error) {
+	key := st.urlPrefix + st.mapping.Get(path)
+	hash, exist := st.sriCache[key]
+	if !exist {
+		var err error
+		hash, err = computeSriHash(key)
+		if err != nil {
+			return "", err
+		}
+		st.sriCache[key] = hash
+	}
+	return hash, nil
 }
 
 // Static returns URL prefix for static assets. Mainly intended to be used for image files etc. Usually not used directly, but registered in tempalte via FuncMap.
@@ -231,10 +275,20 @@ func WithMappingBuilder(builder MappingBuilder) optionSetter {
 	return func(st *Static) { st.mappingBuilder = builder }
 }
 
-// WithUseMinified can be used in NewStatic to specify whether resoruce mapping should be used.
+// WithUseMinified can be used in NewStatic to specify whether resource mapping should be used.
 // false can be useful in debug mode.
 func WithUseMinified(minified bool) optionSetter {
 	return func(st *Static) { st.useMinified = minified }
+}
+
+// WithUseSri can be used in NewStatic to specify whether base64-encoded sha256 cryptographic
+// hash should be generated for the assets. The hash is being embedded in the resource tag via
+// the integrity param, and verified by the browser.
+//
+// The hash of an asset is computed on the first request of the asset, and is cached in memory
+// for subsequent requests.
+func WithUseSri(sri bool) optionSetter {
+	return func(st *Static) { st.useSri = sri }
 }
 
 func attrSliceToMap(attrsSlice []string) (map[string]string, error) {
@@ -265,4 +319,21 @@ func updateMap(updated map[string]string, updating map[string]string) {
 	for key, value := range updating {
 		updated[key] = value
 	}
+}
+
+func computeSriHash(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+
+	hash := base64.StdEncoding.EncodeToString(h.Sum(nil))
+
+	return "sha256-" + hash, nil
 }
